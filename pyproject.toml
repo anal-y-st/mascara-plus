@@ -1,0 +1,15 @@
+
+[project]
+name = "mascara"
+version = "0.2.0"
+description = "Flexible mask training framework"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["torch","tqdm","typer","PyYAML","tensorboard","Pillow","numpy","torchvision; python_version >= '3.9'"]
+
+[project.scripts]
+mascara = "mascara.cli:app"
+
+[build-system]
+requires = ["setuptools","wheel"]
+build-backend = "setuptools.build_meta"
