@@ -8,6 +8,23 @@ from .training import Trainer
 from .metrics import Dice, IoU, PixelAccuracy
 from .losses import get_loss, CombinedLoss
 
+import importlib.util, sys, os
+
+def load_dataloaders(module_path: str, fn_name: str, **kwargs):
+    if module_path.endswith(".py") and os.path.isfile(module_path):
+        module_name = os.path.splitext(os.path.basename(module_path))[0]
+        spec = importlib.util.spec_from_file_location(module_name, module_path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = mod
+        spec.loader.exec_module(mod)
+    else:
+        mod = importlib.import_module(module_path)
+
+    fn = getattr(mod, fn_name)
+    ret = fn(**kwargs)
+    from .utils.loader_adapter import adapt_user_getters
+    return adapt_user_getters(ret)
+
 app = typer.Typer(help="mascara: mask training & evaluation")
 
 def parse_kv(s: Optional[str]):
