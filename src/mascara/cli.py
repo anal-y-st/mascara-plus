@@ -11,6 +11,7 @@ from .losses import get_loss, CombinedLoss
 import importlib.util, sys, os
 
 def load_dataloaders(module_path: str, fn_name: str, **kwargs):
+    """Load dataloaders from either a module import path or a .py file path."""
     if module_path.endswith(".py") and os.path.isfile(module_path):
         module_name = os.path.splitext(os.path.basename(module_path))[0]
         spec = importlib.util.spec_from_file_location(module_name, module_path)
@@ -18,6 +19,7 @@ def load_dataloaders(module_path: str, fn_name: str, **kwargs):
         sys.modules[module_name] = mod
         spec.loader.exec_module(mod)
     else:
+        # Try plain import first (module path like "my_pkg.my_mod")
         mod = importlib.import_module(module_path)
 
     fn = getattr(mod, fn_name)
@@ -37,10 +39,7 @@ def parse_kv(s: Optional[str]):
     try: return json.loads(s)
     except json.JSONDecodeError: return yaml.safe_load(s)
 
-def load_dataloaders(module_path: str, fn_name: str, **kwargs):
-    mod = importlib.import_module(module_path); fn = getattr(mod, fn_name); ret = fn(**kwargs)
-    from .utils.loader_adapter import adapt_user_getters
-    return adapt_user_getters(ret)
+# (Duplicate definition removed; unified above to support both file paths and module paths)
 
 @app.command()
 def available_models():

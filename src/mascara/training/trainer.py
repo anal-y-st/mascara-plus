@@ -34,6 +34,10 @@ class Trainer:
         self.logger = setup_logging(str(self.workdir)); self.writer = SummaryWriter(log_dir=str(self.workdir/"tb"))
         self.amp = bool((trainer_cfg or {}).get("amp", True)); self.grad_clip = (trainer_cfg or {}).get("grad_clip", None)
         self.viz_every = int((trainer_cfg or {}).get("viz_every_n_steps", 200)); self.log_every = int((trainer_cfg or {}).get("log_every_n_steps", 50)); self.max_viz = int((trainer_cfg or {}).get("max_viz_items",4)); self.early_patience = (trainer_cfg or {}).get("early_stop_patience", 10)
+        # Visualize only for first N epochs if provided (None means all epochs)
+        ve = (trainer_cfg or {}).get("viz_epochs", None)
+        if isinstance(ve, int) and ve <= 0: ve = None
+        self.viz_epochs = int(ve) if ve is not None else None
         self.scaler = torch.cuda.amp.GradScaler(enabled=self.amp and self.device.type=="cuda")
         self.best_score = float("-inf"); self.early_counter = 0; self.logger.info(f"Device: {self.device} | AMP: {self.amp and self.device.type=='cuda'}")
     def _run_metrics(self, preds, targets, stage: str, step: int):
@@ -62,7 +66,8 @@ class Trainer:
                 self.writer.add_scalar("train/loss", loss.item(), step); pbar.set_postfix({"loss": f"{loss.item():.4f}"})
                 if (i % self.log_every) == 0: self.logger.info(f"epoch {epoch} step {i} loss={loss.item():.4f}")
                 self._run_metrics(logits.detach(), y, stage="train", step=step)
-                if log_images and (i % self.viz_every) == 0: b = min(self.max_viz, x.shape[0]); save_triptych(logits[:b].detach(), y[:b], self.viz_dir, prefix=f"train_ep{epoch}_it{i}", step=step)
+                should_viz_epoch = (self.viz_epochs is None) or (epoch <= self.viz_epochs)
+                if log_images and should_viz_epoch and (i % self.viz_every) == 0: b = min(self.max_viz, x.shape[0]); save_triptych(logits[:b].detach(), y[:b], self.viz_dir, prefix=f"train_ep{epoch}_it{i}", step=step)
                 step += 1
             if val_loader is not None:
                 score = self.validate(val_loader, epoch=epoch) or -loss.item()

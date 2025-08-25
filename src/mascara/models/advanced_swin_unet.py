@@ -1,6 +1,7 @@
 
-# EXACT user-provided model
 import torch, torch.nn as nn, torch.nn.functional as F, numpy as np
+
+
 class SwinBlock(nn.Module):
     def __init__(self, dim, heads=4, mlp_ratio=4.0, dropout=0.0):
         super().__init__()
@@ -12,23 +13,30 @@ class SwinBlock(nn.Module):
         x = x + self.attn(self.norm1(x), self.norm1(x), self.norm1(x))[0]
         x = x + self.mlp(self.norm2(x))
         return x
+    
 class ResidualConvBlock(nn.Module):
     def __init__(self,in_ch,out_ch):
         super().__init__()
         self.conv = nn.Sequential(nn.Conv2d(in_ch,out_ch,3,padding=1,bias=False), nn.BatchNorm2d(out_ch), nn.ReLU(inplace=True), nn.Conv2d(out_ch,out_ch,3,padding=1,bias=False), nn.BatchNorm2d(out_ch))
         self.shortcut = nn.Conv2d(in_ch,out_ch,1) if in_ch!=out_ch else nn.Identity()
-    def forward(self,x): return F.relu(self.conv(x) + self.shortcut(x))
+    def forward(self,x): 
+        return F.relu(self.conv(x) + self.shortcut(x))
+    
+
 class CBAM(nn.Module):
     def __init__(self, channels, reduction=16):
         super().__init__()
         self.ca = nn.Sequential(nn.AdaptiveAvgPool2d(1), nn.Conv2d(channels, channels//reduction, 1), nn.ReLU(inplace=True), nn.Conv2d(channels//reduction, channels, 1), nn.Sigmoid())
         self.spatial = nn.Sequential(nn.Conv2d(2,1,kernel_size=7,padding=3), nn.Sigmoid())
+    
     def forward(self,x):
         ca = self.ca(x) * x
         max_pool = torch.max(ca, dim=1, keepdim=True)[0]
         avg_pool = torch.mean(ca, dim=1, keepdim=True)
         sa = self.spatial(torch.cat([avg_pool, max_pool], dim=1)) * ca
         return sa
+    
+
 class AdvancedSwinUNet(nn.Module):
     def __init__(self, in_ch=18, out_ch=1, embed_dim=120, depth=3, heads=5, img_size=(128,128)):
         super().__init__()
@@ -43,6 +51,7 @@ class AdvancedSwinUNet(nn.Module):
         self.up2 = nn.ConvTranspose2d(embed_dim//2, embed_dim//4, kernel_size=2, stride=2)
         self.dec2 = ResidualConvBlock(embed_dim//4, embed_dim//4)
         self.final = nn.Conv2d(embed_dim//4, out_ch, kernel_size=1)
+    
     def forward(self,x):
         B,C,H,W = x.shape
         p = self.patch(x); Hp,Wp = p.shape[2], p.shape[3]
